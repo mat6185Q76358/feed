@@ -95,79 +95,94 @@ const modalDesc = document.getElementById('modalDesc');
 const modalClose = document.getElementById('modalClose');
 
 // Show/hide upload form
-showUpload.addEventListener('click', ()=>uploadForm.style.display = uploadForm.style.display==='none'?'block':'none');
-
-// Upload
-uploadBtn.addEventListener('click', async ()=>{
-  const file = photoInput.files[0];
-  if(!file){alert("Choose a photo!"); return;}
-  const desc = imgDesc.value.trim();
-  try{
-    const storageRef = storage.ref('images/' + Date.now() + '_' + file.name);
-    await storageRef.put(file);
-    const url = await storageRef.getDownloadURL();
-    await db.collection('posts').add({url, desc, likes:0, created:Date.now()});
-    photoInput.value=''; imgDesc.value=''; uploadForm.style.display='none';
-    loadFeed();
-  }catch(e){alert("Upload failed: "+e.message);}
+showUpload.addEventListener('click', () => {
+  uploadForm.style.display = uploadForm.style.display === 'none' ? 'block' : 'none';
 });
 
-// Load Feed
-async function loadFeed(){
-  feedEl.innerHTML='';
-  const snapshot = await db.collection('posts').orderBy('created','desc').get();
-  snapshot.forEach(docSnap=>{
-    const item={id:docSnap.id,...docSnap.data()};
-    const wrapper=document.createElement('div'); wrapper.className='feed-item';
-    wrapper.innerHTML=`<img src="${item.url}">`;
-    wrapper.addEventListener('click',()=>openModal(item));
-    const heartWrap=document.createElement('div'); heartWrap.className='heart-wrap';
-    heartWrap.innerHTML=`
-      <button class="heart-btn">
-        <svg class="heart-svg ${item.likes>0?'liked':''}" viewBox="0 0 24 24">
-          <path d="M12.1 21.35l-1.1-.99C5.14 15.36 2 12.28 2 8.5 2 6.02 4.02 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 17.98 4 20 6.02 20 8.5c0 3.78-3.14 6.86-8.9 11.86l-1 1z"/>
-        </svg>
-        <div class="heart-count">${item.likes}</div>
-      `;
-    const heartBtn=heartWrap.querySelector('.heart-btn');
-    const heartSvg=heartWrap.querySelector('.heart-svg');
-    const heartCount=heartWrap.querySelector('.heart-count');
-    heartBtn.addEventListener('click', ev=>{ev.stopPropagation(); toggleLike(item.id,heartSvg,heartCount);});
-    wrapper.appendChild(heartWrap);
-    feedEl.appendChild(wrapper);
+// Upload
+uploadBtn.addEventListener('click', async () => {
+  const file = photoInput.files[0];
+  if (!file) { alert("Choose a photo!"); return; }
+  const desc = imgDesc.value.trim();
+  try {
+    const storageRef = storage.ref('images/' + Date.now() + '_' + file.name);
+    const snapshot = await storageRef.put(file);
+    const url = await snapshot.ref.getDownloadURL();
+    await db.collection('posts').add({ url, desc, likes: 0, created: Date.now() });
+    photoInput.value = ''; 
+    imgDesc.value = ''; 
+    uploadForm.style.display = 'none';
+  } catch (e) {
+    alert("Upload failed: " + e.message);
+    console.error(e);
+  }
+});
+
+// Render single post
+function renderPost(item) {
+  const wrapper = document.createElement('div'); 
+  wrapper.className = 'feed-item';
+  wrapper.innerHTML = `<img src="${item.url}">`;
+  wrapper.addEventListener('click', () => openModal(item));
+
+  const heartWrap = document.createElement('div'); 
+  heartWrap.className = 'heart-wrap';
+  heartWrap.innerHTML = `
+    <button class="heart-btn">
+      <svg class="heart-svg ${item.likes>0?'liked':''}" viewBox="0 0 24 24">
+        <path d="M12.1 21.35l-1.1-.99C5.14 15.36 2 12.28 2 8.5 2 6.02 4.02 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 17.98 4 20 6.02 20 8.5c0 3.78-3.14 6.86-8.9 11.86l-1 1z"/>
+      </svg>
+      <div class="heart-count">${item.likes}</div>
+    `;
+  const heartBtn = heartWrap.querySelector('.heart-btn');
+  const heartSvg = heartWrap.querySelector('.heart-svg');
+  const heartCount = heartWrap.querySelector('.heart-count');
+  heartBtn.addEventListener('click', ev => { 
+    ev.stopPropagation(); 
+    toggleLike(item.id, heartSvg, heartCount); 
   });
+  wrapper.appendChild(heartWrap);
+  return wrapper;
 }
 
+// Realtime Feed
+db.collection('posts').orderBy('created', 'desc')
+  .onSnapshot(snapshot => {
+    feedEl.innerHTML = '';
+    snapshot.forEach(docSnap => {
+      const item = { id: docSnap.id, ...docSnap.data() };
+      feedEl.appendChild(renderPost(item));
+    });
+  });
+
 // Toggle Like
-async function toggleLike(postId, heartSvg, heartCountEl){
-  const postRef=db.collection('posts').doc(postId);
-  const docSnap=await postRef.get();
-  const data=docSnap.data();
-  const liked=!heartSvg.classList.contains('liked');
-  await postRef.update({likes:data.likes+(liked?1:-1)});
+async function toggleLike(postId, heartSvg, heartCountEl) {
+  const postRef = db.collection('posts').doc(postId);
+  const docSnap = await postRef.get();
+  const data = docSnap.data();
+  const liked = !heartSvg.classList.contains('liked');
+  await postRef.update({ likes: data.likes + (liked ? 1 : -1) });
   heartSvg.classList.toggle('liked');
-  heartCountEl.textContent=data.likes+(liked?1:-1);
-  if(liked){
-    const animHeart=document.createElementNS("http://www.w3.org/2000/svg","svg");
-    animHeart.setAttribute("viewBox","0 0 24 24"); animHeart.classList.add("heart-anim");
-    animHeart.innerHTML='<path d="M12.1 21.35l-1.1-.99C5.14 15.36 2 12.28 2 8.5 2 6.02 4.02 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 17.98 4 20 6.02 20 8.5c0 3.78-3.14 6.86-8.9 11.86l-1 1z"/>';
+  heartCountEl.textContent = data.likes + (liked ? 1 : -1);
+  if (liked) {
+    const animHeart = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    animHeart.setAttribute("viewBox", "0 0 24 24"); 
+    animHeart.classList.add("heart-anim");
+    animHeart.innerHTML = '<path d="M12.1 21.35l-1.1-.99C5.14 15.36 2 12.28 2 8.5 2 6.02 4.02 4 6.5 4c1.74 0 3.41.81 4.5 2.09C12.09 4.81 13.76 4 15.5 4 17.98 4 20 6.02 20 8.5c0 3.78-3.14 6.86-8.9 11.86l-1 1z"/>';
     heartSvg.parentNode.appendChild(animHeart);
-    setTimeout(()=>animHeart.remove(),600);
+    setTimeout(() => animHeart.remove(), 600);
   }
 }
 
 // Modal
-function openModal(item){
-  modalImg.src=item.url;
-  modalLikes.textContent='Likes: '+item.likes;
-  modalDesc.textContent=item.desc||'';
+function openModal(item) {
+  modalImg.src = item.url;
+  modalLikes.textContent = 'Likes: ' + item.likes;
+  modalDesc.textContent = item.desc || '';
   modal.classList.add('open');
 }
-modalClose.addEventListener('click',()=>modal.classList.remove('open'));
-modal.addEventListener('click', ev=>{if(ev.target===modal) modal.classList.remove('open');});
-
-// Initial load
-loadFeed();
+modalClose.addEventListener('click', () => modal.classList.remove('open'));
+modal.addEventListener('click', ev => { if (ev.target === modal) modal.classList.remove('open'); });
 </script>
 
 </body>
