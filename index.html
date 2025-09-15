@@ -3,214 +3,201 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Snap-Like App</title>
+<title>SnapClone Firebase</title>
 <style>
-  body, html {
-    margin: 0;
-    padding: 0;
-    font-family: Arial, sans-serif;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
-  }
-
-  .content {
-    flex: 1;
-    display: none;
-    overflow: hidden;
-    position: relative;
-  }
-
-  .active {
-    display: block;
-  }
-
-  /* Bottom tab bar */
-  .tab-bar {
-    display: flex;
-    justify-content: space-around;
-    align-items: center;
-    height: 60px;
-    background: #222;
-    color: white;
-  }
-
-  .tab-bar div {
-    flex: 1;
-    text-align: center;
-    font-size: 24px;
-    cursor: pointer;
-    padding: 10px 0;
-  }
-
-  /* Camera styling */
-  #cameraVideo {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  #cameraCanvas {
-    display: none;
-    position: absolute;
-    top: 0;
-    left: 0;
-  }
-
-  /* Overlay text */
-  #textOverlay {
-    position: absolute;
-    top: 20px;
-    left: 20px;
-    color: white;
-    font-size: 24px;
-    text-shadow: 1px 1px 2px black;
-  }
-
-  /* Posts Feed */
-  #postsFeed {
-    padding: 10px;
-    overflow-y: auto;
-    height: 100%;
-  }
-
-  #postsFeed img {
-    width: 100%;
-    margin-bottom: 10px;
-    border-radius: 10px;
-  }
-
-  /* Buttons */
-  .camera-buttons {
-    position: absolute;
-    bottom: 20px;
-    width: 100%;
-    display: flex;
-    justify-content: center;
-    gap: 10px;
-  }
-
-  .camera-buttons button {
-    padding: 10px 15px;
-    font-size: 16px;
-    border: none;
-    border-radius: 8px;
-    cursor: pointer;
-  }
-
-  input[type="text"] {
-    position: absolute;
-    bottom: 80px;
-    left: 20px;
-    width: 80%;
-    padding: 5px;
-    font-size: 18px;
-  }
+  body { margin:0; font-family:Arial,sans-serif; display:flex; flex-direction:column; height:100vh; background:#f2f2f2; }
+  .content { flex:1; overflow-y:auto; padding:10px; display:none; }
+  .active { display:block; }
+  .navbar { height:60px; display:flex; justify-content:space-around; align-items:center; background:#fff; border-top:1px solid #ccc; position:sticky; bottom:0; }
+  .nav-item { font-size:24px; cursor:pointer; }
+  #cameraView { display:flex; flex-direction:column; align-items:center; }
+  #cameraView video { width:100%; max-height:400px; border-radius:10px; }
+  #cameraView canvas { display:none; }
+  #cameraView button { margin:10px; padding:10px 20px; font-size:16px; }
+  #overlayText { width:90%; padding:5px; margin:5px 0; }
+  #loginBtn { margin:20px; padding:10px 20px; font-size:18px; }
+  #userInfo { margin:10px; }
+  #posts img, #savedList img { width:100%; margin-bottom:10px; border-radius:10px; }
 </style>
 </head>
 <body>
 
-<!-- Your Posts Tab -->
-<div id="tabPosts" class="content active">
-  <h2 style="padding: 10px;">Your Posts</h2>
-  <div id="userPosts"></div>
+<div id="loginScreen" class="content active">
+  <h2>Welcome to SnapClone</h2>
+  <button id="loginBtn">Sign in with Google</button>
 </div>
 
-<!-- Camera Tab -->
-<div id="tabCamera" class="content">
-  <video id="cameraVideo" autoplay></video>
-  <canvas id="cameraCanvas"></canvas>
-  <input type="text" id="cameraText" placeholder="Add text..." />
-  <div class="camera-buttons">
-    <button id="takePhoto">Capture</button>
-    <button id="savePhoto">Save</button>
-    <button id="deletePhoto">Delete</button>
-    <button id="postPhoto">Post</button>
+<div id="posts" class="content">
+  <div id="userInfo"></div>
+  <h2>My Posts</h2>
+  <div id="postList"></div>
+</div>
+
+<div id="camera" class="content">
+  <h2>Camera</h2>
+  <div id="cameraView">
+    <video id="video" autoplay></video>
+    <canvas id="canvas"></canvas>
+    <input type="text" id="overlayText" placeholder="Enter text overlay">
+    <div id="cameraButtons">
+      <button id="takePhoto">Take Photo</button>
+      <button id="savePhoto" style="display:none;">Save</button>
+      <button id="deletePhoto" style="display:none;">Delete</button>
+      <button id="addText" style="display:none;">Add Text Overlay</button>
+    </div>
   </div>
 </div>
 
-<!-- Feed Tab -->
-<div id="tabFeed" class="content">
-  <h2 style="padding: 10px;">Feed</h2>
-  <div id="postsFeed"></div>
+<div id="saved" class="content">
+  <h2>Saved Posts</h2>
+  <div id="savedList"></div>
 </div>
 
-<!-- Bottom Tabs -->
-<div class="tab-bar">
-  <div id="btnPosts">👤</div>
-  <div id="btnCamera">📷</div>
-  <div id="btnFeed">🎬</div>
+<div class="navbar">
+  <div class="nav-item" data-target="posts">📝</div>
+  <div class="nav-item" data-target="camera">📷</div>
+  <div class="nav-item" data-target="saved">💾</div>
 </div>
 
-<script>
-  // Tab switching
-  const tabs = {
-    btnPosts: 'tabPosts',
-    btnCamera: 'tabCamera',
-    btnFeed: 'tabFeed'
+<!-- Firebase SDK (modular v9+) -->
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-analytics.js";
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-auth.js";
+  import { getFirestore, collection, addDoc, query, where, getDocs, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js";
+  import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.14.0/firebase-storage.js";
+
+  const firebaseConfig = {
+    apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
+    authDomain: "appp-5f90c.firebaseapp.com",
+    projectId: "appp-5f90c",
+    storageBucket: "appp-5f90c.appspot.com",
+    messagingSenderId: "215310083943",
+    appId: "1:215310083943:web:7869ceb90a03567558b1c2",
+    measurementId: "G-JJQCFT3PQ9"
   };
 
-  for (let btn in tabs) {
-    document.getElementById(btn).addEventListener('click', () => {
-      document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-      document.getElementById(tabs[btn]).classList.add('active');
-    });
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+  const auth = getAuth(app);
+  const db = getFirestore(app);
+  const storage = getStorage(app);
+
+  const loginScreen = document.getElementById('loginScreen');
+  const loginBtn = document.getElementById('loginBtn');
+  const userInfo = document.getElementById('userInfo');
+  const postList = document.getElementById('postList');
+  const savedList = document.getElementById('savedList');
+
+  const provider = new GoogleAuthProvider();
+  loginBtn.addEventListener('click', () => signInWithPopup(auth, provider));
+
+  function logout() {
+    signOut(auth);
   }
 
-  // Camera setup
-  const video = document.getElementById('cameraVideo');
-  const canvas = document.getElementById('cameraCanvas');
-  const ctx = canvas.getContext('2d');
-  const textInput = document.getElementById('cameraText');
+  onAuthStateChanged(auth, async (user) => {
+    if(user){
+      loginScreen.classList.remove('active');
+      document.getElementById('posts').classList.add('active');
+      userInfo.innerHTML = `<p>Signed in as ${user.displayName}</p><button onclick="logout()">Sign out</button>`;
+      await renderPosts();
+    } else {
+      loginScreen.classList.add('active');
+      document.getElementById('posts').classList.remove('active');
+    }
+  });
 
-  navigator.mediaDevices.getUserMedia({ video: true })
-    .then(stream => video.srcObject = stream)
-    .catch(err => console.error('Camera access denied', err));
+  // Navigation
+  const navItems = document.querySelectorAll('.nav-item');
+  const contents = document.querySelectorAll('.content');
+  navItems.forEach(item => {
+    item.addEventListener('click', async () => {
+      contents.forEach(c => c.classList.remove('active'));
+      document.getElementById(item.dataset.target).classList.add('active');
+      if(item.dataset.target === 'saved') await renderSaved();
+    });
+  });
 
-  function capturePhoto() {
+  // Camera
+  const video = document.getElementById('video');
+  const canvas = document.getElementById('canvas');
+  const takePhotoBtn = document.getElementById('takePhoto');
+  const savePhotoBtn = document.getElementById('savePhoto');
+  const deletePhotoBtn = document.getElementById('deletePhoto');
+  const addTextBtn = document.getElementById('addText');
+  const overlayInput = document.getElementById('overlayText');
+
+  navigator.mediaDevices.getUserMedia({ video: true }).then(stream => { video.srcObject = stream; });
+
+  let photoTaken = false;
+
+  takePhotoBtn.addEventListener('click', () => {
     canvas.width = video.videoWidth;
     canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0);
-    // Draw text
-    ctx.font = '40px Arial';
-    ctx.fillStyle = 'white';
-    ctx.fillText(textInput.value, 20, 50);
+    canvas.getContext('2d').drawImage(video, 0, 0);
+    video.style.display = 'none';
     canvas.style.display = 'block';
-  }
+    takePhotoBtn.style.display = 'none';
+    savePhotoBtn.style.display = 'inline-block';
+    deletePhotoBtn.style.display = 'inline-block';
+    addTextBtn.style.display = 'inline-block';
+    photoTaken = true;
+  });
 
-  function savePhoto() {
-    const link = document.createElement('a');
-    link.download = 'photo.png';
-    link.href = canvas.toDataURL();
-    link.click();
-  }
+  addTextBtn.addEventListener('click', () => {
+    const ctx = canvas.getContext('2d');
+    const text = overlayInput.value;
+    ctx.font = "40px Arial";
+    ctx.fillStyle = "white";
+    ctx.strokeStyle = "black";
+    ctx.lineWidth = 2;
+    ctx.strokeText(text, 20, 50);
+    ctx.fillText(text, 20, 50);
+  });
 
-  function deletePhoto() {
+  savePhotoBtn.addEventListener('click', async () => {
+    const base64 = canvas.toDataURL('image/png');
+    await uploadPhoto(base64);
+    resetCamera();
+    await renderPosts();
+  });
+
+  deletePhotoBtn.addEventListener('click', () => { resetCamera(); });
+
+  function resetCamera(){
+    video.style.display = 'block';
     canvas.style.display = 'none';
-    textInput.value = '';
+    takePhotoBtn.style.display = 'inline-block';
+    savePhotoBtn.style.display = 'none';
+    deletePhotoBtn.style.display = 'none';
+    addTextBtn.style.display = 'none';
+    overlayInput.value = '';
+    photoTaken = false;
   }
 
-  function postPhoto() {
-    const imgData = canvas.toDataURL();
-    // Add to Feed
-    const img = document.createElement('img');
-    img.src = imgData;
-    document.getElementById('postsFeed').prepend(img);
-    // Add to User Posts
-    const userImg = document.createElement('img');
-    userImg.src = imgData;
-    document.getElementById('userPosts').prepend(userImg);
-    deletePhoto();
+  // Firebase functions
+  async function uploadPhoto(base64Data){
+    const user = auth.currentUser;
+    if(!user) return alert("Sign in first");
+    const storageRef = ref(storage, `posts/${user.uid}/${Date.now()}.png`);
+    await uploadString(storageRef, base64Data, 'data_url');
+    const url = await getDownloadURL(storageRef);
+    await addDoc(collection(db,"posts"), { uid:user.uid, imageUrl:url, createdAt:serverTimestamp() });
   }
 
-  document.getElementById('takePhoto').addEventListener('click', capturePhoto);
-  document.getElementById('savePhoto').addEventListener('click', savePhoto);
-  document.getElementById('deletePhoto').addEventListener('click', deletePhoto);
-  document.getElementById('postPhoto').addEventListener('click', postPhoto);
+  async function renderPosts(){
+    const user = auth.currentUser;
+    if(!user) return;
+    const q = query(collection(db,"posts"), where("uid","==",user.uid), orderBy("createdAt","desc"));
+    const snapshot = await getDocs(q);
+    postList.innerHTML = snapshot.docs.map(doc => `<img src="${doc.data().imageUrl}">`).join('');
+  }
 
+  async function renderSaved(){
+    await renderPosts(); // for now same as posts
+    savedList.innerHTML = postList.innerHTML;
+  }
 </script>
-
 </body>
 </html>
-
-
