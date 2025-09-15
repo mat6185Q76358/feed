@@ -1,201 +1,268 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Photo Feed App</title>
-  <style>
-    body { margin:0; font-family:Arial,sans-serif; background:#f9f9f9; }
-    .page { display:none; height:calc(100vh - 60px); overflow:auto; }
-    .active { display:block; }
-    .navbar { position:fixed; bottom:0; left:0; right:0;
-      height:60px; display:flex; justify-content:space-around; align-items:center;
-      background:#fff; border-top:1px solid #ccc; }
-    .navbar button { background:none; border:none; font-size:20px; cursor:pointer; }
-    #feed, #my-posts { padding:10px; }
-    .post { border:1px solid #ccc; border-radius:10px; padding:10px; margin-bottom:10px; background:#fff; }
-    .post img { width:100%; border-radius:10px; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Photo App</title>
+<style>
+  body { margin:0; font-family:Arial,sans-serif; background:#f9f9f9; }
+  .page { display:none; height:calc(100vh - 60px); overflow:auto; }
+  .active { display:block; }
+  .navbar {
+    position:fixed; bottom:0; left:0; right:0;
+    height:60px; display:flex; justify-content:space-around; align-items:center;
+    background:#fff; border-top:1px solid #ccc;
+  }
+  .navbar button { background:none; border:none; font-size:20px; cursor:pointer; }
+
+  #login-page { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; }
+  #login-page input { margin:5px; padding:8px; width:200px; }
+  #login-page button { margin:5px; padding:8px; }
+
+  #myposts img, .post img { width:100%; border-radius:10px; margin-bottom:10px; }
+  #camera-page { display:flex; flex-direction:column; justify-content:center; align-items:center; }
+  video, canvas { max-width:100%; border-radius:10px; }
+  .controls { margin-top:10px; }
+  .shutter { width:60px; height:60px; border-radius:50%; background:red; border:none; cursor:pointer; }
+  .actions { margin-top:10px; }
+  .actions button { margin:0 5px; }
+
+  #feed { padding:10px; }
+  .post { background:#fff; padding:10px; border-radius:10px; margin-bottom:10px; }
+  .likes { margin-top:5px; }
+  .comments { margin-top:5px; font-size:14px; color:#555; }
+</style>
 </head>
 <body>
 
-<!-- Page 1 (My Posts / Manage) -->
-<div id="page1" class="page active">
-  <div style="padding:10px;">
-    <h2>My Posts</h2>
-    <button id="logout-btn">Sign Out</button>
-    <div id="my-posts"></div>
-  </div>
+<!-- LOGIN -->
+<div id="login-page">
+  <h2>Login to Continue</h2>
+  <button id="google-login">Login with Google</button>
+  <h3>Or Create Account</h3>
+  <input type="email" id="email" placeholder="Email">
+  <input type="password" id="password" placeholder="Password">
+  <button id="signup">Sign Up</button>
+  <button id="email-login">Login with Email</button>
 </div>
 
-<!-- Page 2 (Camera) -->
-<div id="page2" class="page">
-  <div style="display:flex; flex-direction:column; align-items:center; padding:10px;">
-    <video id="video" autoplay playsinline style="width:100%; border-radius:10px;"></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <button id="shutter" style="margin:10px; width:60px; height:60px; border-radius:50%; background:red; border:none;"></button>
-    <div id="camera-actions" style="display:none;">
-      <button id="delete">Delete</button>
-      <button id="post">Post</button>
+<!-- APP -->
+<div id="app" style="display:none;">
+
+  <!-- Page 1: My Posts -->
+  <div id="page1" class="page active">
+    <h2 style="padding:10px;">My Posts</h2>
+    <div id="myposts"></div>
+  </div>
+
+  <!-- Page 2: Camera -->
+  <div id="page2" class="page">
+    <div id="camera-page">
+      <video id="video" autoplay playsinline></video>
+      <canvas id="canvas" style="display:none;"></canvas>
+      <div class="controls">
+        <button class="shutter" id="shutter"></button>
+      </div>
+      <div class="actions" id="actions" style="display:none;">
+        <button id="delete">Delete</button>
+        <button id="post">Post</button>
+      </div>
     </div>
   </div>
-</div>
 
-<!-- Page 3 (Feed) -->
-<div id="page3" class="page">
-  <div id="feed"></div>
-</div>
+  <!-- Page 3: Feed -->
+  <div id="page3" class="page">
+    <h2 style="padding:10px;">Feed</h2>
+    <div id="feed"></div>
+  </div>
 
-<!-- Navbar -->
-<div class="navbar">
-  <button onclick="showPage(1)">👤</button>
-  <button onclick="showPage(2)">📷</button>
-  <button onclick="showPage(3)">📰</button>
+  <!-- Navbar -->
+  <div class="navbar">
+    <button onclick="showPage(1)">👤</button>
+    <button onclick="showPage(2)">📷</button>
+    <button onclick="showPage(3)">📰</button>
+    <button id="logout">🚪</button>
+  </div>
 </div>
 
 <script type="module">
-  import { initializeApp } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-app.js";
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-auth.js";
-  import { getFirestore, collection, addDoc, onSnapshot, updateDoc, doc, deleteDoc, arrayUnion } from "https://www.gstatic.com/firebasejs/10.13.1/firebase-firestore.js";
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { 
+  getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, 
+  signInWithEmailAndPassword, onAuthStateChanged, signOut 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { 
+  getFirestore, collection, addDoc, query, onSnapshot, orderBy, 
+  serverTimestamp, doc, updateDoc, arrayUnion, getDoc, deleteDoc 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { 
+  getStorage, ref, uploadString, getDownloadURL, deleteObject 
+} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
-  // Firebase config (yours)
-  const firebaseConfig = {
-    apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
-    authDomain: "appp-5f90c.firebaseapp.com",
-    projectId: "appp-5f90c",
-    storageBucket: "appp-5f90c.firebasestorage.app",
-    messagingSenderId: "215310083943",
-    appId: "1:215310083943:web:7869ceb90a03567558b1c2",
-    measurementId: "G-JJQCFT3PQ9"
-  };
+// Replace with your Firebase config
+const firebaseConfig = {
+  apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
+  authDomain: "appp-5f90c.firebaseapp.com",
+  projectId: "appp-5f90c",
+  storageBucket: "appp-5f90c.appspot.com",
+  messagingSenderId: "215310083943",
+  appId: "1:215310083943:web:7869ceb90a03567558b1c2",
+  measurementId: "G-JJQCFT3PQ9"
+};
 
-  const app = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
+
+// --- LOGIN HANDLERS ---
+const loginPage = document.getElementById('login-page');
+const appDiv = document.getElementById('app');
+
+document.getElementById('google-login').onclick = async () => {
   const provider = new GoogleAuthProvider();
-  const db = getFirestore(app);
+  await signInWithPopup(auth, provider);
+};
+document.getElementById('signup').onclick = async () => {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  await createUserWithEmailAndPassword(auth,email,password);
+};
+document.getElementById('email-login').onclick = async () => {
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+  await signInWithEmailAndPassword(auth,email,password);
+};
+document.getElementById('logout').onclick = () => signOut(auth);
 
-  let currentUser = null;
-
-  function showPage(n) {
-    if (!currentUser && n !== 1) {
-      alert("Please log in first!");
-      n = 1;
-    }
-    document.querySelectorAll('.page').forEach((p,i)=> p.classList.toggle('active', i===n-1));
+// --- AUTH STATE ---
+let currentUser = null;
+onAuthStateChanged(auth, user => {
+  currentUser = user;
+  if(user){
+    loginPage.style.display='none';
+    appDiv.style.display='block';
+    loadPosts();
+    showPage(3);
+  } else {
+    loginPage.style.display='flex';
+    appDiv.style.display='none';
   }
+});
 
-  // Auth
-  const logoutBtn = document.getElementById("logout-btn");
-  logoutBtn.onclick = () => signOut(auth);
+// --- NAVIGATION ---
+const pages = [document.getElementById('page1'),document.getElementById('page2'),document.getElementById('page3')];
+window.showPage = function(n){
+  if(!currentUser && n!==1){ alert("Login first"); n=1;}
+  pages.forEach((p,i)=>p.classList.toggle('active',i===n-1));
+};
 
-  onAuthStateChanged(auth, user => {
-    currentUser = user;
-    if (user) {
-      loadMyPosts();
-      showPage(3); // go to feed when logged in
-    } else {
-      alert("Please sign in with Google to use this app.");
-      signInWithPopup(auth, provider);
-    }
+// --- CAMERA ---
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const shutter = document.getElementById('shutter');
+const actions = document.getElementById('actions');
+const ctx = canvas.getContext('2d');
+
+navigator.mediaDevices.getUserMedia({video:true})
+  .then(stream => video.srcObject = stream)
+  .catch(err=>alert("Camera error: "+err));
+
+shutter.onclick = ()=>{
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  video.style.display='none';
+  canvas.style.display='block';
+  shutter.style.display='none';
+  actions.style.display='block';
+};
+
+document.getElementById('delete').onclick = ()=>{
+  video.style.display='block';
+  canvas.style.display='none';
+  shutter.style.display='inline-block';
+  actions.style.display='none';
+};
+
+document.getElementById('post').onclick = async ()=>{
+  if(!currentUser) return alert("Login required");
+  const dataUrl = canvas.toDataURL('image/png');
+  const fileName = `${currentUser.uid}_${Date.now()}.png`;
+  const storageRef = ref(storage, `posts/${fileName}`);
+  await uploadString(storageRef,dataUrl,'data_url');
+  const downloadURL = await getDownloadURL(storageRef);
+
+  await addDoc(collection(db,"posts"),{
+    uid: currentUser.uid,
+    photo: downloadURL,
+    storagePath: `posts/${fileName}`,
+    likes: [],
+    comments: [],
+    createdAt: serverTimestamp()
   });
 
-  // Camera
-  const video = document.getElementById('video');
-  const canvas = document.getElementById('canvas');
-  const ctx = canvas.getContext('2d');
-  const shutter = document.getElementById('shutter');
-  const actions = document.getElementById('camera-actions');
+  document.getElementById('delete').click();
+  showPage(1);
+};
 
-  navigator.mediaDevices.getUserMedia({ video:true })
-    .then(stream => video.srcObject = stream);
+// --- FEED & MY POSTS ---
+const feedDiv = document.getElementById('feed');
+const myPostsDiv = document.getElementById('myposts');
 
-  shutter.onclick = () => {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    video.style.display = 'none';
-    canvas.style.display = 'block';
-    shutter.style.display = 'none';
-    actions.style.display = 'block';
-  };
-
-  document.getElementById('delete').onclick = resetCamera;
-  function resetCamera() {
-    video.style.display = 'block';
-    canvas.style.display = 'none';
-    shutter.style.display = 'inline-block';
-    actions.style.display = 'none';
-  }
-
-  document.getElementById('post').onclick = async () => {
-    if (!currentUser) { alert("Login required"); return; }
-    const dataUrl = canvas.toDataURL("image/png");
-    await addDoc(collection(db,"posts"), {
-      user: currentUser.uid,
-      name: currentUser.displayName,
-      photoURL: currentUser.photoURL,
-      image: dataUrl,
-      likes: [],
-      comments: [],
-      created: Date.now()
-    });
-    resetCamera();
-    showPage(1); // go to My Posts after posting
-  };
-
-  // Feed
-  const feed = document.getElementById('feed');
-  onSnapshot(collection(db,"posts"), snapshot => {
-    feed.innerHTML = "";
-    snapshot.docs.sort((a,b)=>b.data().created - a.data().created).forEach(docSnap => {
+function loadPosts(){
+  const q = query(collection(db,"posts"),orderBy("createdAt","desc"));
+  onSnapshot(q, snapshot=>{
+    feedDiv.innerHTML='';
+    myPostsDiv.innerHTML='';
+    snapshot.forEach(docSnap=>{
       const post = docSnap.data();
-      const div = document.createElement("div");
-      div.className = "post";
+      const div = document.createElement('div');
+      div.className='post';
       div.innerHTML = `
-        <div><strong>${post.name}</strong></div>
-        <img src="${post.image}" />
-        <div>
-          <button onclick="likePost('${docSnap.id}')">❤️ ${post.likes.length}</button>
-        </div>
+        <img src="${post.photo}">
+        <div class="likes">❤️ ${post.likes?.length || 0} <button onclick="likePost('${docSnap.id}')">Like</button></div>
+        <div class="comments">${(post.comments||[]).map(c=>`<div>${c}</div>`).join('')}</div>
+        <input placeholder="Add comment..." onkeydown="if(event.key==='Enter'){commentPost('${docSnap.id}',this.value); this.value='';}">
       `;
-      feed.appendChild(div);
+      feedDiv.appendChild(div);
+
+      if(currentUser && post.uid===currentUser.uid){
+        const myDiv = document.createElement('div');
+        myDiv.className='post';
+        myDiv.innerHTML = `<img src="${post.photo}"> <button onclick="deletePost('${docSnap.id}')">Delete</button>`;
+        myPostsDiv.appendChild(myDiv);
+      }
     });
   });
+}
 
-  // My Posts
-  const myPostsDiv = document.getElementById("my-posts");
-  function loadMyPosts() {
-    onSnapshot(collection(db,"posts"), snapshot => {
-      myPostsDiv.innerHTML = "";
-      snapshot.docs
-        .filter(docSnap => docSnap.data().user === currentUser?.uid)
-        .sort((a,b)=>b.data().created - a.data().created)
-        .forEach(docSnap => {
-          const post = docSnap.data();
-          const div = document.createElement("div");
-          div.className = "post";
-          div.innerHTML = `
-            <div><strong>${post.name}</strong></div>
-            <img src="${post.image}" />
-            <div>
-              <button onclick="deletePost('${docSnap.id}')">🗑️ Delete</button>
-            </div>
-          `;
-          myPostsDiv.appendChild(div);
-        });
-    });
+// --- LIKE / COMMENT / DELETE ---
+window.likePost = async id=>{
+  if(!currentUser) return;
+  const refDoc = doc(db,"posts",id);
+  await updateDoc(refDoc,{likes:arrayUnion(currentUser.uid)});
+};
+window.commentPost = async (id,text)=>{
+  if(!text.trim()) return;
+  const refDoc = doc(db,"posts",id);
+  await updateDoc(refDoc,{comments:arrayUnion(text)});
+};
+window.deletePost = async id=>{
+  if(confirm("Delete this post?")){
+    const refDoc = doc(db,"posts",id);
+    const snap = await getDoc(refDoc);
+    if(snap.exists()){
+      const post = snap.data();
+      if(post.storagePath){
+        const imgRef = ref(storage,post.storagePath);
+        await deleteObject(imgRef).catch(()=>console.log("Storage already deleted"));
+      }
+    }
+    await deleteDoc(refDoc);
   }
-
-  window.likePost = async (id) => {
-    if (!currentUser) return alert("Login required");
-    const ref = doc(db,"posts",id);
-    await updateDoc(ref,{ likes: arrayUnion(currentUser.uid) });
-  };
-
-  window.deletePost = async (id) => {
-    await deleteDoc(doc(db,"posts",id));
-  };
+};
 </script>
-
 </body>
 </html>
+
