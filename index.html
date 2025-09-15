@@ -1,165 +1,131 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Photo App (No Login)</title>
-<style>
-body { margin:0; font-family:Arial,sans-serif; background:#f9f9f9; }
-.page { display:none; height:calc(100vh - 60px); overflow:auto; }
-.active { display:block; }
-.navbar {
-  position:fixed; bottom:0; left:0; right:0;
-  height:60px; display:flex; justify-content:space-around; align-items:center;
-  background:#fff; border-top:1px solid #ccc;
+// App.js
+import React, { useState, useRef } from 'react';
+import { View, Text, Button, Image, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
+import { NavigationContainer } from '@react-navigation/native';
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { Ionicons } from '@expo/vector-icons';
+import { Camera } from 'expo-camera';
+import * as MediaLibrary from 'expo-media-library';
+
+const Tab = createBottomTabNavigator();
+
+// ----- Screen 1: Your Posts -----
+function YourPostsScreen() {
+  return (
+    <View style={styles.center}>
+      <Text>Your Posts will appear here.</Text>
+    </View>
+  );
 }
-.navbar button { background:none; border:none; font-size:20px; cursor:pointer; }
 
-#myposts img, .post img { width:100%; border-radius:10px; margin-bottom:10px; }
-#camera-page { display:flex; flex-direction:column; justify-content:center; align-items:center; }
-video, canvas { max-width:100%; border-radius:10px; }
-.controls { margin-top:10px; }
-.shutter { width:60px; height:60px; border-radius:50%; background:red; border:none; cursor:pointer; }
-.actions { margin-top:10px; }
-.actions button { margin:0 5px; }
+// ----- Screen 2: Camera -----
+function CameraScreen() {
+  const [hasPermission, setHasPermission] = useState(null);
+  const [capturedPhoto, setCapturedPhoto] = useState(null);
+  const [textOverlay, setTextOverlay] = useState('');
+  const cameraRef = useRef(null);
 
-#feed { padding:10px; }
-.post { background:#fff; padding:10px; border-radius:10px; margin-bottom:10px; }
-.likes { margin-top:5px; }
-.comments { margin-top:5px; font-size:14px; color:#555; }
-</style>
-</head>
-<body>
+  React.useEffect(() => {
+    (async () => {
+      const { status } = await Camera.requestCameraPermissionsAsync();
+      const mediaStatus = await MediaLibrary.requestPermissionsAsync();
+      setHasPermission(status === 'granted' && mediaStatus.status === 'granted');
+    })();
+  }, []);
 
-<!-- Page 1: My Posts -->
-<div id="page1" class="page active">
-  <h2 style="padding:10px;">My Posts</h2>
-  <div id="myposts"></div>
-</div>
-
-<!-- Page 2: Camera -->
-<div id="page2" class="page">
-  <div id="camera-page">
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
-    <div class="controls">
-      <button class="shutter" id="shutter"></button>
-    </div>
-    <div class="actions" id="actions" style="display:none;">
-      <button id="delete">Delete</button>
-      <button id="post">Post</button>
-    </div>
-  </div>
-</div>
-
-<!-- Page 3: Feed -->
-<div id="page3" class="page">
-  <h2 style="padding:10px;">Feed</h2>
-  <div id="feed"></div>
-</div>
-
-<!-- Navbar -->
-<div class="navbar">
-  <button onclick="showPage(1)">👤</button>
-  <button onclick="showPage(2)">📷</button>
-  <button onclick="showPage(3)">📰</button>
-</div>
-
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
-
-// Firebase config
-const firebaseConfig = {
-  apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
-  authDomain: "appp-5f90c.firebaseapp.com",
-  projectId: "appp-5f90c",
-  storageBucket: "appp-5f90c.appspot.com",
-  messagingSenderId: "215310083943",
-  appId: "1:215310083943:web:7869ceb90a03567558b1c2",
-  measurementId: "G-JJQCFT3PQ9"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-const storage = getStorage(app);
-
-// Navigation
-const pages = [document.getElementById('page1'),document.getElementById('page2'),document.getElementById('page3')];
-window.showPage = function(n){ pages.forEach((p,i)=>p.classList.toggle('active', i===n-1)); };
-
-// Camera
-const video = document.getElementById('video');
-const canvas = document.getElementById('canvas');
-const shutter = document.getElementById('shutter');
-const actions = document.getElementById('actions');
-const ctx = canvas.getContext('2d');
-
-navigator.mediaDevices.getUserMedia({video:true})
-.then(stream => video.srcObject = stream)
-.catch(err=>alert("Camera error: "+err));
-
-shutter.onclick = ()=>{
-  canvas.width = video.videoWidth;
-  canvas.height = video.videoHeight;
-  ctx.drawImage(video,0,0,canvas.width,canvas.height);
-  video.style.display='none';
-  canvas.style.display='block';
-  shutter.style.display='none';
-  actions.style.display='block';
-};
-
-document.getElementById('delete').onclick = ()=>{
-  video.style.display='block';
-  canvas.style.display='none';
-  shutter.style.display='inline-block';
-  actions.style.display='none';
-};
-
-document.getElementById('post').onclick = async ()=>{
-  const dataUrl = canvas.toDataURL('image/png');
-  const fileName = `anon_${Date.now()}.png`;
-  const storageRef = ref(storage, `posts/${fileName}`);
-  await uploadString(storageRef,dataUrl,'data_url');
-  const downloadURL = await getDownloadURL(storageRef);
-
-  await addDoc(collection(db,"posts"),{
-    uid: "anon",
-    photo: downloadURL,
-    storagePath: `posts/${fileName}`,
-    likes: [],
-    comments: [],
-    createdAt: serverTimestamp()
-  });
-
-  document.getElementById('delete').click();
-  showPage(1);
-};
-
-// Feed & My Posts
-const feedDiv = document.getElementById('feed');
-const myPostsDiv = document.getElementById('myposts');
-
-const q = query(collection(db,"posts"), orderBy("createdAt","desc"));
-onSnapshot(q, snapshot=>{
-  feedDiv.innerHTML='';
-  myPostsDiv.innerHTML='';
-  snapshot.forEach(docSnap=>{
-    const post = docSnap.data();
-    const div = document.createElement('div');
-    div.className='post';
-    div.innerHTML = `<img src="${post.photo}"><div class="likes">❤️ ${post.likes?.length || 0}</div>`;
-    feedDiv.appendChild(div);
-
-    if(post.uid==="anon"){
-      const myDiv = document.createElement('div');
-      myDiv.className='post';
-      myDiv.innerHTML = `<img src="${post.photo}">`;
-      myPostsDiv.appendChild(myDiv);
+  const takePicture = async () => {
+    if (cameraRef.current) {
+      const photo = await cameraRef.current.takePictureAsync();
+      setCapturedPhoto(photo.uri);
     }
-  });
+  };
+
+  const saveToDevice = async () => {
+    if (capturedPhoto) {
+      await MediaLibrary.createAssetAsync(capturedPhoto);
+      alert('Saved to device!');
+      setCapturedPhoto(null);
+      setTextOverlay('');
+    }
+  };
+
+  if (hasPermission === null) {
+    return <View style={styles.center}><Text>Requesting camera permissions...</Text></View>;
+  }
+  if (hasPermission === false) {
+    return <View style={styles.center}><Text>No access to camera</Text></View>;
+  }
+
+  return (
+    <View style={{ flex: 1 }}>
+      {!capturedPhoto ? (
+        <Camera style={{ flex: 1 }} ref={cameraRef}>
+          <View style={styles.cameraButtonContainer}>
+            <TouchableOpacity style={styles.cameraButton} onPress={takePicture} />
+          </View>
+        </Camera>
+      ) : (
+        <View style={{ flex: 1 }}>
+          <Image source={{ uri: capturedPhoto }} style={{ flex: 1 }} />
+          <TextInput
+            placeholder="Add text..."
+            value={textOverlay}
+            onChangeText={setTextOverlay}
+            style={styles.textInput}
+          />
+          <View style={styles.actionButtons}>
+            <Button title="Post" onPress={() => alert('Posted!')} />
+            <Button title="Delete" color="red" onPress={() => { setCapturedPhoto(null); setTextOverlay(''); }} />
+            <Button title="Save" onPress={saveToDevice} />
+          </View>
+        </View>
+      )}
+    </View>
+  );
+}
+
+// ----- Screen 3: Posts Feed -----
+function PostsScreen() {
+  return (
+    <View style={styles.center}>
+      <Text>Posts feed will appear here.</Text>
+    </View>
+  );
+}
+
+// ----- App Navigator -----
+export default function App() {
+  return (
+    <NavigationContainer>
+      <Tab.Navigator
+        screenOptions={({ route }) => ({
+          tabBarIcon: ({ color, size }) => {
+            let iconName;
+            if (route.name === 'Your Posts') iconName = 'person-outline';
+            else if (route.name === 'Camera') iconName = 'camera-outline';
+            else if (route.name === 'Feed') iconName = 'film-outline';
+            return <Ionicons name={iconName} size={size} color={color} />;
+          },
+          tabBarActiveTintColor: 'tomato',
+          tabBarInactiveTintColor: 'gray',
+        })}
+      >
+        <Tab.Screen name="Your Posts" component={YourPostsScreen} />
+        <Tab.Screen name="Camera" component={CameraScreen} />
+        <Tab.Screen name="Feed" component={PostsScreen} />
+      </Tab.Navigator>
+    </NavigationContainer>
+  );
+}
+
+// ----- Styles -----
+const styles = StyleSheet.create({
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  cameraButtonContainer: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 },
+  cameraButton: { width: 70, height: 70, backgroundColor: 'white', borderRadius: 35 },
+  textInput: {
+    position: 'absolute', top: 50, left: 20, right: 20, backgroundColor: 'rgba(0,0,0,0.4)',
+    color: 'white', padding: 10, borderRadius: 10
+  },
+  actionButtons: { flexDirection: 'row', justifyContent: 'space-around', padding: 10 }
 });
-</script>
-</body>
-</html>
