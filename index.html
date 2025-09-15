@@ -1,131 +1,179 @@
-// App.js
-import React, { useState, useRef } from 'react';
-import { View, Text, Button, Image, TouchableOpacity, TextInput, StyleSheet } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
-import { Camera } from 'expo-camera';
-import * as MediaLibrary from 'expo-media-library';
-
-const Tab = createBottomTabNavigator();
-
-// ----- Screen 1: Your Posts -----
-function YourPostsScreen() {
-  return (
-    <View style={styles.center}>
-      <Text>Your Posts will appear here.</Text>
-    </View>
-  );
-}
-
-// ----- Screen 2: Camera -----
-function CameraScreen() {
-  const [hasPermission, setHasPermission] = useState(null);
-  const [capturedPhoto, setCapturedPhoto] = useState(null);
-  const [textOverlay, setTextOverlay] = useState('');
-  const cameraRef = useRef(null);
-
-  React.useEffect(() => {
-    (async () => {
-      const { status } = await Camera.requestCameraPermissionsAsync();
-      const mediaStatus = await MediaLibrary.requestPermissionsAsync();
-      setHasPermission(status === 'granted' && mediaStatus.status === 'granted');
-    })();
-  }, []);
-
-  const takePicture = async () => {
-    if (cameraRef.current) {
-      const photo = await cameraRef.current.takePictureAsync();
-      setCapturedPhoto(photo.uri);
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>My Web App</title>
+<style>
+    body, html {
+        margin: 0;
+        padding: 0;
+        font-family: Arial, sans-serif;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
     }
-  };
-
-  const saveToDevice = async () => {
-    if (capturedPhoto) {
-      await MediaLibrary.createAssetAsync(capturedPhoto);
-      alert('Saved to device!');
-      setCapturedPhoto(null);
-      setTextOverlay('');
+    .content {
+        flex: 1;
+        overflow-y: auto;
+        display: none;
+        padding: 10px;
     }
-  };
+    .active {
+        display: block;
+    }
+    .bottom-nav {
+        display: flex;
+        justify-content: space-around;
+        align-items: center;
+        height: 60px;
+        background: #fff;
+        border-top: 1px solid #ccc;
+        position: sticky;
+        bottom: 0;
+    }
+    .bottom-nav button {
+        background: none;
+        border: none;
+        font-size: 24px;
+        cursor: pointer;
+    }
+    .camera-container {
+        position: relative;
+        text-align: center;
+    }
+    video, canvas {
+        width: 100%;
+        max-height: 400px;
+        border: 1px solid #ccc;
+        border-radius: 10px;
+    }
+    .actions {
+        margin-top: 10px;
+        display: flex;
+        justify-content: space-around;
+    }
+    .text-overlay {
+        position: absolute;
+        bottom: 50px;
+        left: 10px;
+        color: white;
+        font-size: 24px;
+        background-color: rgba(0,0,0,0.5);
+        padding: 5px 10px;
+        border-radius: 5px;
+    }
+    input[type="text"] {
+        width: 80%;
+        padding: 5px;
+        font-size: 18px;
+        margin-top: 5px;
+    }
+    .post-img {
+        width: 100%;
+        margin-bottom: 10px;
+        border-radius: 10px;
+    }
+</style>
+</head>
+<body>
 
-  if (hasPermission === null) {
-    return <View style={styles.center}><Text>Requesting camera permissions...</Text></View>;
-  }
-  if (hasPermission === false) {
-    return <View style={styles.center}><Text>No access to camera</Text></View>;
-  }
+<!-- Posts Tab -->
+<div id="postsTab" class="content active">
+    <h2>Your Posts</h2>
+    <div id="userPosts"></div>
+</div>
 
-  return (
-    <View style={{ flex: 1 }}>
-      {!capturedPhoto ? (
-        <Camera style={{ flex: 1 }} ref={cameraRef}>
-          <View style={styles.cameraButtonContainer}>
-            <TouchableOpacity style={styles.cameraButton} onPress={takePicture} />
-          </View>
-        </Camera>
-      ) : (
-        <View style={{ flex: 1 }}>
-          <Image source={{ uri: capturedPhoto }} style={{ flex: 1 }} />
-          <TextInput
-            placeholder="Add text..."
-            value={textOverlay}
-            onChangeText={setTextOverlay}
-            style={styles.textInput}
-          />
-          <View style={styles.actionButtons}>
-            <Button title="Post" onPress={() => alert('Posted!')} />
-            <Button title="Delete" color="red" onPress={() => { setCapturedPhoto(null); setTextOverlay(''); }} />
-            <Button title="Save" onPress={saveToDevice} />
-          </View>
-        </View>
-      )}
-    </View>
-  );
-}
+<!-- Camera Tab -->
+<div id="cameraTab" class="content">
+    <h2>Camera</h2>
+    <div class="camera-container">
+        <video id="video" autoplay></video>
+        <canvas id="canvas" style="display:none;"></canvas>
+        <div id="textOverlay" class="text-overlay"></div>
+    </div>
+    <input type="text" id="textInput" placeholder="Add text..." oninput="updateText()">
+    <div class="actions">
+        <button onclick="takePhoto()">📸 Take Photo</button>
+        <button onclick="savePhoto()">💾 Save</button>
+        <button onclick="deletePhoto()">🗑️ Delete</button>
+    </div>
+</div>
 
-// ----- Screen 3: Posts Feed -----
-function PostsScreen() {
-  return (
-    <View style={styles.center}>
-      <Text>Posts feed will appear here.</Text>
-    </View>
-  );
-}
+<!-- Feed Tab -->
+<div id="feedTab" class="content">
+    <h2>Feed</h2>
+    <div id="feedPosts"></div>
+</div>
 
-// ----- App Navigator -----
-export default function App() {
-  return (
-    <NavigationContainer>
-      <Tab.Navigator
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ color, size }) => {
-            let iconName;
-            if (route.name === 'Your Posts') iconName = 'person-outline';
-            else if (route.name === 'Camera') iconName = 'camera-outline';
-            else if (route.name === 'Feed') iconName = 'film-outline';
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: 'tomato',
-          tabBarInactiveTintColor: 'gray',
-        })}
-      >
-        <Tab.Screen name="Your Posts" component={YourPostsScreen} />
-        <Tab.Screen name="Camera" component={CameraScreen} />
-        <Tab.Screen name="Feed" component={PostsScreen} />
-      </Tab.Navigator>
-    </NavigationContainer>
-  );
-}
+<!-- Bottom Navigation -->
+<div class="bottom-nav">
+    <button onclick="showTab('postsTab')">👤</button>
+    <button onclick="showTab('cameraTab')">📷</button>
+    <button onclick="showTab('feedTab')">🎞️</button>
+</div>
 
-// ----- Styles -----
-const styles = StyleSheet.create({
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  cameraButtonContainer: { flex: 1, justifyContent: 'flex-end', alignItems: 'center', marginBottom: 20 },
-  cameraButton: { width: 70, height: 70, backgroundColor: 'white', borderRadius: 35 },
-  textInput: {
-    position: 'absolute', top: 50, left: 20, right: 20, backgroundColor: 'rgba(0,0,0,0.4)',
-    color: 'white', padding: 10, borderRadius: 10
-  },
-  actionButtons: { flexDirection: 'row', justifyContent: 'space-around', padding: 10 }
-});
+<script>
+    const tabs = ['postsTab', 'cameraTab', 'feedTab'];
+
+    function showTab(tabId) {
+        tabs.forEach(id => document.getElementById(id).classList.remove('active'));
+        document.getElementById(tabId).classList.add('active');
+    }
+
+    // Camera setup
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const textOverlay = document.getElementById('textOverlay');
+    const textInput = document.getElementById('textInput');
+    const userPosts = document.getElementById('userPosts');
+    const feedPosts = document.getElementById('feedPosts');
+    let currentPhoto = null;
+
+    navigator.mediaDevices.getUserMedia({ video: true })
+        .then(stream => { video.srcObject = stream; })
+        .catch(err => { alert('Camera access denied'); });
+
+    function updateText() {
+        textOverlay.innerText = textInput.value;
+    }
+
+    function takePhoto() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        ctx.drawImage(video, 0, 0);
+        if (textInput.value) {
+            ctx.font = "30px Arial";
+            ctx.fillStyle = "white";
+            ctx.fillText(textInput.value, 10, canvas.height - 50);
+        }
+        currentPhoto = canvas.toDataURL('image/png');
+        alert('Photo taken! You can save or delete.');
+    }
+
+    function savePhoto() {
+        if (!currentPhoto) return alert('No photo taken');
+        // Add to posts
+        const img = document.createElement('img');
+        img.src = currentPhoto;
+        img.className = 'post-img';
+        userPosts.prepend(img);
+        feedPosts.prepend(img.cloneNode());
+        // Clear input
+        textInput.value = '';
+        textOverlay.innerText = '';
+        currentPhoto = null;
+        alert('Photo saved!');
+    }
+
+    function deletePhoto() {
+        currentPhoto = null;
+        textInput.value = '';
+        textOverlay.innerText = '';
+        alert('Photo deleted');
+    }
+</script>
+
+</body>
+</html>
