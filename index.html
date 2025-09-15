@@ -3,54 +3,74 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Photo App - Login Required</title>
+<title>Photo App (No Login)</title>
 <style>
-  body { margin:0; font-family:Arial,sans-serif; background:#f9f9f9; }
-  .page { display:none; height:calc(100vh - 60px); overflow:auto; }
-  .active { display:block; }
-  .navbar {
-    position:fixed; bottom:0; left:0; right:0;
-    height:60px; display:flex; justify-content:space-around; align-items:center;
-    background:#fff; border-top:1px solid #ccc;
-  }
-  .navbar button { background:none; border:none; font-size:20px; cursor:pointer; }
+body { margin:0; font-family:Arial,sans-serif; background:#f9f9f9; }
+.page { display:none; height:calc(100vh - 60px); overflow:auto; }
+.active { display:block; }
+.navbar {
+  position:fixed; bottom:0; left:0; right:0;
+  height:60px; display:flex; justify-content:space-around; align-items:center;
+  background:#fff; border-top:1px solid #ccc;
+}
+.navbar button { background:none; border:none; font-size:20px; cursor:pointer; }
 
-  /* Login page */
-  #login-page { display:flex; flex-direction:column; justify-content:center; align-items:center; height:100vh; }
-  #login-page input { margin:5px; padding:8px; width:200px; }
-  #login-page button { margin:5px; padding:8px; }
+#myposts img, .post img { width:100%; border-radius:10px; margin-bottom:10px; }
+#camera-page { display:flex; flex-direction:column; justify-content:center; align-items:center; }
+video, canvas { max-width:100%; border-radius:10px; }
+.controls { margin-top:10px; }
+.shutter { width:60px; height:60px; border-radius:50%; background:red; border:none; cursor:pointer; }
+.actions { margin-top:10px; }
+.actions button { margin:0 5px; }
+
+#feed { padding:10px; }
+.post { background:#fff; padding:10px; border-radius:10px; margin-bottom:10px; }
+.likes { margin-top:5px; }
+.comments { margin-top:5px; font-size:14px; color:#555; }
 </style>
 </head>
 <body>
 
-<!-- Login page -->
-<div id="login-page">
-  <h2>Login to use the app</h2>
-  <button id="google-login">Login with Google</button>
-  <h3>Or Email/Password</h3>
-  <input type="email" id="email" placeholder="Email">
-  <input type="password" id="password" placeholder="Password">
-  <button id="signup">Sign Up</button>
-  <button id="email-login">Login</button>
+<!-- Page 1: My Posts -->
+<div id="page1" class="page active">
+  <h2 style="padding:10px;">My Posts</h2>
+  <div id="myposts"></div>
 </div>
 
-<!-- App -->
-<div id="app" style="display:none;">
-  <div id="page1" class="page active"><h2>My Posts</h2><div id="myposts"></div></div>
-  <div id="page2" class="page"><h2>Camera</h2></div>
-  <div id="page3" class="page"><h2>Feed</h2><div id="feed"></div></div>
-  <div class="navbar">
-    <button onclick="showPage(1)">👤</button>
-    <button onclick="showPage(2)">📷</button>
-    <button onclick="showPage(3)">📰</button>
-    <button id="logout">🚪</button>
+<!-- Page 2: Camera -->
+<div id="page2" class="page">
+  <div id="camera-page">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <div class="controls">
+      <button class="shutter" id="shutter"></button>
+    </div>
+    <div class="actions" id="actions" style="display:none;">
+      <button id="delete">Delete</button>
+      <button id="post">Post</button>
+    </div>
   </div>
+</div>
+
+<!-- Page 3: Feed -->
+<div id="page3" class="page">
+  <h2 style="padding:10px;">Feed</h2>
+  <div id="feed"></div>
+</div>
+
+<!-- Navbar -->
+<div class="navbar">
+  <button onclick="showPage(1)">👤</button>
+  <button onclick="showPage(2)">📷</button>
+  <button onclick="showPage(3)">📰</button>
 </div>
 
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-import { getAuth, GoogleAuthProvider, signInWithPopup, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, collection, addDoc, query, onSnapshot, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+import { getStorage, ref, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-storage.js";
 
+// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
   authDomain: "appp-5f90c.firebaseapp.com",
@@ -62,47 +82,84 @@ const firebaseConfig = {
 };
 
 const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
+const db = getFirestore(app);
+const storage = getStorage(app);
 
-const loginPage = document.getElementById('login-page');
-const appDiv = document.getElementById('app');
-
-document.getElementById('google-login').onclick = async () => {
-  const provider = new GoogleAuthProvider();
-  await signInWithPopup(auth, provider);
-};
-document.getElementById('signup').onclick = async () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  await createUserWithEmailAndPassword(auth,email,password);
-};
-document.getElementById('email-login').onclick = async () => {
-  const email = document.getElementById('email').value;
-  const password = document.getElementById('password').value;
-  await signInWithEmailAndPassword(auth,email,password);
-};
-document.getElementById('logout').onclick = () => signOut(auth);
-
-let currentUser = null;
-onAuthStateChanged(auth, user => {
-  currentUser = user;
-  if(user){
-    loginPage.style.display='none';
-    appDiv.style.display='block';
-  } else {
-    // Force login if not signed in
-    loginPage.style.display='flex';
-    appDiv.style.display='none';
-    alert("Please log in to use the app");
-  }
-});
-
-// Simple navigation
+// Navigation
 const pages = [document.getElementById('page1'),document.getElementById('page2'),document.getElementById('page3')];
-window.showPage = function(n){
-  if(!currentUser){ alert("You must log in first"); return; }
-  pages.forEach((p,i)=> p.classList.toggle('active', i===n-1));
+window.showPage = function(n){ pages.forEach((p,i)=>p.classList.toggle('active', i===n-1)); };
+
+// Camera
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const shutter = document.getElementById('shutter');
+const actions = document.getElementById('actions');
+const ctx = canvas.getContext('2d');
+
+navigator.mediaDevices.getUserMedia({video:true})
+.then(stream => video.srcObject = stream)
+.catch(err=>alert("Camera error: "+err));
+
+shutter.onclick = ()=>{
+  canvas.width = video.videoWidth;
+  canvas.height = video.videoHeight;
+  ctx.drawImage(video,0,0,canvas.width,canvas.height);
+  video.style.display='none';
+  canvas.style.display='block';
+  shutter.style.display='none';
+  actions.style.display='block';
 };
+
+document.getElementById('delete').onclick = ()=>{
+  video.style.display='block';
+  canvas.style.display='none';
+  shutter.style.display='inline-block';
+  actions.style.display='none';
+};
+
+document.getElementById('post').onclick = async ()=>{
+  const dataUrl = canvas.toDataURL('image/png');
+  const fileName = `anon_${Date.now()}.png`;
+  const storageRef = ref(storage, `posts/${fileName}`);
+  await uploadString(storageRef,dataUrl,'data_url');
+  const downloadURL = await getDownloadURL(storageRef);
+
+  await addDoc(collection(db,"posts"),{
+    uid: "anon",
+    photo: downloadURL,
+    storagePath: `posts/${fileName}`,
+    likes: [],
+    comments: [],
+    createdAt: serverTimestamp()
+  });
+
+  document.getElementById('delete').click();
+  showPage(1);
+};
+
+// Feed & My Posts
+const feedDiv = document.getElementById('feed');
+const myPostsDiv = document.getElementById('myposts');
+
+const q = query(collection(db,"posts"), orderBy("createdAt","desc"));
+onSnapshot(q, snapshot=>{
+  feedDiv.innerHTML='';
+  myPostsDiv.innerHTML='';
+  snapshot.forEach(docSnap=>{
+    const post = docSnap.data();
+    const div = document.createElement('div');
+    div.className='post';
+    div.innerHTML = `<img src="${post.photo}"><div class="likes">❤️ ${post.likes?.length || 0}</div>`;
+    feedDiv.appendChild(div);
+
+    if(post.uid==="anon"){
+      const myDiv = document.createElement('div');
+      myDiv.className='post';
+      myDiv.innerHTML = `<img src="${post.photo}">`;
+      myPostsDiv.appendChild(myDiv);
+    }
+  });
+});
 </script>
 </body>
 </html>
