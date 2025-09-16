@@ -2,124 +2,64 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>SnapClone — Firebase GitHub Pages Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SnapClone — GitHub Pages Demo</title>
   <style>
-    :root{
-      --snap-yellow: #FFFC00;
-      --snap-dark: #111827;
-      --muted: #6b7280;
-      --card-bg: #ffffff;
-      --gap: 12px;
-      font-family: Inter, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
-    }
-    html,body{height:100%;margin:0;background:#f3f4f6;color:var(--snap-dark);}
-    .app{min-height:100%;display:flex;flex-direction:column;max-width:900px;margin:0 auto;background:transparent;}
-    header{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;background:#ffffff;border-bottom:1px solid #e6e7e8;position:sticky;top:0;z-index:20}
-    header h1{font-size:18px;margin:0}
-    header .user{display:flex;align-items:center;gap:10px}
-    header img.avatar{height:36px;width:36px;border-radius:999px;object-fit:cover}
-    main{flex:1;padding:16px}
-    .card{background:var(--card-bg);border-radius:14px;padding:12px;box-shadow:0 6px 18px rgba(15,23,42,0.06);margin-bottom:var(--gap)}
-    .nav{position:sticky;bottom:0;background:#fff;border-top:1px solid #e6e7e8;padding:10px 16px;display:flex;gap:8px;align-items:center;justify-content:space-between}
-    .tab-btn{flex:1;padding:8px 10px;border-radius:10px;background:transparent;border:0;display:flex;flex-direction:column;align-items:center;gap:6px;color:var(--muted);cursor:pointer}
-    .tab-btn.active{color:var(--snap-yellow);font-weight:600}
+    body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;}
+    header{display:flex;justify-content:space-between;padding:12px 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
+    main{padding:16px;}
     .camera-wrap{position:relative;border-radius:12px;overflow:hidden;background:#000;height:60vh;display:flex;align-items:center;justify-content:center}
-    video{width:100%;height:100%;object-fit:cover;display:block}
+    video{width:100%;height:100%;object-fit:cover}
+    .overlay-preview{position:absolute;left:0;right:0;bottom:32px;padding:8px;text-align:center;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,0.6);color:white;display:none}
     .camera-controls{display:flex;gap:8px;margin-top:12px;align-items:center}
-    .btn{padding:9px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
-    .btn-primary{background:var(--snap-yellow)}
+    .btn{padding:10px 16px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
+    .btn-primary{background:#FFFC00}
     .btn-ghost{background:#fff;border:1px solid #eaeaea}
     .btn-danger{background:#ffecec;color:#b91c1c}
     .input{flex:1;padding:10px;border-radius:10px;border:1px solid #e6e7e8}
-    .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
-    .post-img{width:100%;height:170px;object-fit:cover;border-radius:8px}
-    .meta{display:flex;align-items:center;gap:8px;margin-top:8px}
-    .small{font-size:12px;color:var(--muted)}
-    .overlay-preview{position:absolute;left:0;right:0;bottom:32px;padding:8px;text-align:center;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,0.6);color:white}
-    @media (max-width:520px){ .camera-wrap{height:52vh} .post-img{height:140px} header h1{font-size:16px} }
+    .preview-actions{display:flex;gap:8px;margin-top:12px;align-items:center;display:none}
   </style>
 </head>
 <body>
-  <div class="app" id="app">
-    <header>
-      <h1>SnapClone</h1>
-      <div class="user" id="userBox">
-        <button class="btn btn-primary" id="signInBtn">Sign in with Google</button>
-      </div>
-    </header>
+  <header>
+    <h1>SnapClone</h1>
+    <div id="userBox">
+      <button class="btn btn-primary" id="signInBtn">Sign in with Google</button>
+    </div>
+  </header>
 
-    <main>
-      <section id="profileView" style="display:none">
-        <div class="card">
-          <div style="display:flex;align-items:center;gap:12px">
-            <img id="profileAvatar" src="" class="avatar" style="display:none">
-            <div>
-              <div id="profileName" style="font-weight:700"></div>
-              <div class="small" id="profileEmail"></div>
-            </div>
-          </div>
-          <div style="margin-top:12px" class="small">Your snaps (only snaps you posted are shown here).</div>
-        </div>
-        <div id="profileSnaps" class="grid"></div>
-      </section>
+  <main>
+    <div class="camera-wrap">
+      <video id="video" autoplay playsinline muted></video>
+      <div id="overlayPreview" class="overlay-preview"></div>
+      <canvas id="canvas" style="display:none"></canvas>
+    </div>
 
-      <section id="cameraView" style="display:block">
-        <div class="card">
-          <div class="camera-wrap" id="cameraWrap">
-            <video id="video" autoplay playsinline muted></video>
-            <div class="overlay-preview" id="overlayPreview" style="display:none"></div>
-            <canvas id="canvas" style="display:none"></canvas>
-          </div>
-          <div style="display:flex;gap:8px;margin-top:10px">
-            <input id="overlayInput" class="input" placeholder="Add text overlay" />
-            <button id="flipBtn" class="btn btn-ghost">Flip</button>
-          </div>
-          <div class="camera-controls">
-            <button id="captureBtn" class="btn btn-primary">Capture</button>
-            <button id="clearBtn" class="btn btn-ghost" disabled>Clear</button>
-            <div style="flex:1"></div>
-            <div class="small" id="cameraStatus">Camera off</div>
-          </div>
-          <div id="previewActions" style="display:none;margin-top:12px" class="camera-controls">
-            <button id="postBtn" class="btn" style="background:#14b8a6;color:white">Post</button>
-            <button id="saveBtn" class="btn btn-ghost">Save to device</button>
-            <button id="deleteBtn" class="btn btn-danger">Delete</button>
-            <div style="flex:1"></div>
-            <div class="small" id="uploadStatus"></div>
-          </div>
-        </div>
-      </section>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <input id="overlayInput" class="input" placeholder="Add text overlay"/>
+      <button id="flipBtn" class="btn btn-ghost">Flip</button>
+    </div>
 
-      <section id="feedView" style="display:none">
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div style="font-weight:700">Feed</div>
-            <div class="small">Public snaps</div>
-          </div>
-        </div>
-        <div id="feedGrid" class="grid"></div>
-      </section>
-    </main>
+    <div class="camera-controls">
+      <button id="captureBtn" class="btn btn-primary" disabled>Capture</button>
+      <button id="clearBtn" class="btn btn-ghost" disabled>Clear</button>
+      <div style="flex:1"></div>
+      <div id="cameraStatus">Camera off</div>
+    </div>
 
-    <nav class="nav">
-      <button id="profileTab" class="tab-btn">
-        <div>👤</div><div>Profile</div>
-      </button>
-      <button id="cameraTab" class="tab-btn active">
-        <div style="font-size:18px">📸</div><div>Camera</div>
-      </button>
-      <button id="feedTab" class="tab-btn">
-        <div>📰</div><div>Feed</div>
-      </button>
-    </nav>
-  </div>
+    <div id="previewActions" class="preview-actions">
+      <button id="postBtn" class="btn" style="background:#14b8a6;color:white" disabled>Post</button>
+      <button id="saveBtn" class="btn btn-ghost">Save to device</button>
+      <button id="deleteBtn" class="btn btn-danger">Delete</button>
+      <div style="flex:1"></div>
+      <div id="uploadStatus"></div>
+    </div>
+  </main>
 
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-analytics.js";
     import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, query, orderBy, onSnapshot, serverTimestamp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
+    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
     import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
 
     const firebaseConfig = {
@@ -133,8 +73,6 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    try { getAnalytics(app); } catch(e){}
-
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
     const db = getFirestore(app);
@@ -142,17 +80,6 @@
 
     const signInBtn = document.getElementById('signInBtn');
     const userBox = document.getElementById('userBox');
-    const profileAvatar = document.getElementById('profileAvatar');
-    const profileName = document.getElementById('profileName');
-    const profileEmail = document.getElementById('profileEmail');
-    const profileSnaps = document.getElementById('profileSnaps');
-
-    const profileTab = document.getElementById('profileTab');
-    const cameraTab = document.getElementById('cameraTab');
-    const feedTab = document.getElementById('feedTab');
-    const profileView = document.getElementById('profileView');
-    const cameraView = document.getElementById('cameraView');
-    const feedView = document.getElementById('feedView');
 
     const video = document.getElementById('video');
     const canvas = document.getElementById('canvas');
@@ -160,125 +87,151 @@
     const clearBtn = document.getElementById('clearBtn');
     const overlayInput = document.getElementById('overlayInput');
     const overlayPreview = document.getElementById('overlayPreview');
+    const flipBtn = document.getElementById('flipBtn');
+
     const previewActions = document.getElementById('previewActions');
     const postBtn = document.getElementById('postBtn');
     const saveBtn = document.getElementById('saveBtn');
     const deleteBtn = document.getElementById('deleteBtn');
-    const flipBtn = document.getElementById('flipBtn');
     const cameraStatus = document.getElementById('cameraStatus');
     const uploadStatus = document.getElementById('uploadStatus');
-    const feedGrid = document.getElementById('feedGrid');
 
-    let currentUser = null;
     let mediaStream = null;
-    let capturedDataUrl = null;
     let facingMode = 'user';
+    let currentUser = null;
+    let capturedDataUrl = null;
 
-    function showTab(tab){
-      [profileTab,cameraTab,feedTab].forEach(btn=>btn.classList.remove('active'));
-      profileView.style.display = cameraView.style.display = feedView.style.display = 'none';
-      if(tab==='profile'){profileTab.classList.add('active'); profileView.style.display='block'; renderProfileSnaps();}
-      if(tab==='camera'){cameraTab.classList.add('active'); cameraView.style.display='block'; startCamera();}
-      if(tab==='feed'){feedTab.classList.add('active'); feedView.style.display='block';}
-    }
+    // --- Auth ---
+    signInBtn.addEventListener('click', async () => {
+      try { await signInWithPopup(auth, provider); } 
+      catch(e){ alert('Sign-in failed: ' + e.message); }
+    });
 
-    profileTab.addEventListener('click', ()=>showTab('profile'));
-    cameraTab.addEventListener('click', ()=>showTab('camera'));
-    feedTab.addEventListener('click', ()=>showTab('feed'));
-    showTab('camera');
-
-    signInBtn.addEventListener('click', async ()=>{try{await signInWithPopup(auth,provider);}catch(e){alert('Sign-in failed: '+e.message);}});
-
-    onAuthStateChanged(auth,(user)=>{currentUser=user; updateUserUI();});
-
-    function updateUserUI(){
-      userBox.innerHTML='';
-      if(currentUser){
-        const img=document.createElement('img'); img.src=currentUser.photoURL||''; img.className='avatar'; userBox.appendChild(img);
-        const name=document.createElement('div'); name.textContent=currentUser.displayName||'User'; name.style.fontSize='14px'; name.style.color='var(--muted)'; userBox.appendChild(name);
-        const signOutBtn=document.createElement('button'); signOutBtn.textContent='Sign out'; signOutBtn.className='btn btn-ghost'; signOutBtn.style.marginLeft='8px'; signOutBtn.onclick=async()=>{await signOut(auth)}; userBox.appendChild(signOutBtn);
-        profileAvatar.src=currentUser.photoURL||''; profileAvatar.style.display=currentUser.photoURL?'block':'none'; profileName.textContent=currentUser.displayName||''; profileEmail.textContent=currentUser.email||'';
+    onAuthStateChanged(auth, (user)=>{
+      currentUser = user;
+      if(user){
+        userBox.innerHTML = '';
+        const img = document.createElement('img');
+        img.src = user.photoURL || '';
+        img.style.height = '36px';
+        img.style.width = '36px';
+        img.style.borderRadius = '50%';
+        userBox.appendChild(img);
+        const name = document.createElement('span');
+        name.textContent = user.displayName;
+        name.style.marginLeft='8px';
+        userBox.appendChild(name);
+        const signOutBtn = document.createElement('button');
+        signOutBtn.textContent='Sign out';
+        signOutBtn.className='btn btn-ghost';
+        signOutBtn.style.marginLeft='8px';
+        signOutBtn.onclick = async ()=>{await signOut(auth);};
+        userBox.appendChild(signOutBtn);
       } else {
-        const btn=document.createElement('button'); btn.textContent='Sign in with Google'; btn.className='btn btn-primary'; btn.onclick=async()=>{await signInWithPopup(auth,provider)}; userBox.appendChild(btn);
+        userBox.innerHTML = '';
+        const btn = document.createElement('button');
+        btn.textContent='Sign in with Google';
+        btn.className='btn btn-primary';
+        btn.onclick = async ()=>{await signInWithPopup(auth, provider);}
+        userBox.appendChild(btn);
       }
-    }
+    });
 
+    // --- Camera ---
     async function startCamera(){
-      stopCamera(); cameraStatus.textContent='Starting camera...';
-      try{mediaStream=await navigator.mediaDevices.getUserMedia({video:{facingMode},audio:false});}
-      catch(err1){console.warn('Front camera failed, fallback...',err1); try{mediaStream=await navigator.mediaDevices.getUserMedia({video:true,audio:false});}catch(err2){cameraStatus.textContent='No camera found'; alert('Camera failed'); return;}}
-      video.srcObject=mediaStream; video.play(); cameraStatus.textContent='Camera active'; captureBtn.disabled=false; clearBtn.disabled=true;
+      stopCamera();
+      cameraStatus.textContent='Starting camera...';
+      try {
+        mediaStream = await navigator.mediaDevices.getUserMedia({video:{facingMode}, audio:false});
+      } catch(e){
+        console.warn('Front camera failed, fallback',e);
+        try{ mediaStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false}); }
+        catch(err){ cameraStatus.textContent='No camera found'; alert('Camera failed'); return; }
+      }
+      video.srcObject = mediaStream;
+      await video.play();
+      cameraStatus.textContent='Camera active';
+      captureBtn.disabled=false;
+      clearBtn.disabled=true;
+      postBtn.disabled=true;
     }
 
-    function stopCamera(){if(mediaStream){mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null;} video.srcObject=null; cameraStatus.textContent='Camera off'; captureBtn.disabled=true;}
+    function stopCamera(){
+      if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
+      video.srcObject=null;
+      cameraStatus.textContent='Camera off';
+      captureBtn.disabled=true;
+    }
 
-    flipBtn.addEventListener('click', ()=>{facingMode=facingMode==='user'?'environment':'user'; startCamera();});
-    captureBtn.addEventListener('click', ()=>{capturePhoto();});
-    clearBtn.addEventListener('click', ()=>{overlayInput.value=''; overlayPreview.style.display='none'; clearBtn.disabled=true;});
+    flipBtn.addEventListener('click', ()=>{facingMode = facingMode==='user'?'environment':'user'; startCamera();});
 
-    overlayInput.addEventListener('input', ()=>{overlayPreview.textContent=overlayInput.value; overlayPreview.style.display=overlayInput.value?'block':'none';});
+    overlayInput.addEventListener('input', ()=>{overlayPreview.textContent = overlayInput.value; overlayPreview.style.display = overlayInput.value?'block':'none';});
 
-    function capturePhoto(){
-      if(!mediaStream) return;
-      const w=video.videoWidth||1280, h=video.videoHeight||720;
-      canvas.width=w; canvas.height=h;
-      const ctx=canvas.getContext('2d'); ctx.drawImage(video,0,0,w,h);
-      const text=overlayInput.value&&overlayInput.value.trim();
-      if(text){const fontSize=Math.max(24,Math.floor(w/18)); ctx.font=`${fontSize}px Inter`; ctx.textAlign='center'; ctx.fillStyle='white'; ctx.lineWidth=Math.ceil(fontSize/6); ctx.strokeStyle='rgba(0,0,0,0.6)'; ctx.strokeText(text,w/2,h-fontSize*1.5); ctx.fillText(text,w/2,h-fontSize*1.5);}
-      capturedDataUrl=canvas.toDataURL('image/png');
-      previewActions.style.display='flex'; captureBtn.disabled=true; clearBtn.disabled=false;
+    captureBtn.addEventListener('click', ()=>{
+      if(!mediaStream) return alert('Camera not ready');
+      const w = video.videoWidth, h = video.videoHeight;
+      canvas.width = w; canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(video,0,0,w,h);
+      if(overlayInput.value){
+        const fontSize = Math.max(24, Math.floor(w/18));
+        ctx.font = `${fontSize}px Arial`;
+        ctx.fillStyle='white';
+        ctx.strokeStyle='rgba(0,0,0,0.6)';
+        ctx.lineWidth = Math.ceil(fontSize/6);
+        ctx.textAlign='center';
+        ctx.strokeText(overlayInput.value,w/2,h-fontSize*1.5);
+        ctx.fillText(overlayInput.value,w/2,h-fontSize*1.5);
+      }
+      capturedDataUrl = canvas.toDataURL('image/png');
+      previewActions.style.display='flex';
+      captureBtn.disabled=true;
+      postBtn.disabled=false;
+      clearBtn.disabled=false;
+    });
+
+    function resetPreview(){
+      capturedDataUrl=null;
+      previewActions.style.display='none';
+      captureBtn.disabled=false;
+      postBtn.disabled=true;
+      clearBtn.disabled=true;
+      overlayPreview.style.display='none';
+      overlayInput.value='';
     }
 
     saveBtn.addEventListener('click', ()=>{
       if(!capturedDataUrl) return;
-      const a=document.createElement('a'); a.href=capturedDataUrl; a.download='snap.png'; document.body.appendChild(a); a.click(); document.body.removeChild(a); resetPreview();
+      const a = document.createElement('a');
+      a.href=capturedDataUrl; a.download='snap.png';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      resetPreview();
     });
 
     deleteBtn.addEventListener('click', ()=>{resetPreview();});
 
     postBtn.addEventListener('click', async ()=>{
-      if(!capturedDataUrl||!currentUser) return;
+      if(!capturedDataUrl || !currentUser) return alert('No image or not signed in');
       uploadStatus.textContent='Uploading...';
       try{
-        const storageReference=storageRef(storage,'snaps/'+Date.now()+'_'+currentUser.uid+'.png');
+        const storageReference = storageRef(storage,'snaps/'+Date.now()+'_'+currentUser.uid+'.png');
         await uploadString(storageReference,capturedDataUrl,'data_url');
-        const url=await getDownloadURL(storageReference);
-        await addDoc(collection(db,'snaps'),{uid:currentUser.uid, name:currentUser.displayName, avatar:currentUser.photoURL||'', image:url, timestamp:serverTimestamp()});
+        const url = await getDownloadURL(storageReference);
+        await addDoc(collection(db,'snaps'),{
+          uid: currentUser.uid,
+          name: currentUser.displayName,
+          avatar: currentUser.photoURL||'',
+          image: url,
+          timestamp: serverTimestamp()
+        });
         uploadStatus.textContent='Uploaded!';
         setTimeout(()=>uploadStatus.textContent='',1200);
         resetPreview();
-      }catch(e){uploadStatus.textContent='Upload failed'; console.error(e);}
+      } catch(e){uploadStatus.textContent='Upload failed'; console.error(e);}
     });
 
-    function resetPreview(){capturedDataUrl=null; previewActions.style.display='none'; captureBtn.disabled=false; clearBtn.disabled=true; overlayPreview.style.display='none'; overlayInput.value='';}
-
-    async function renderProfileSnaps(){
-      if(!currentUser) return; profileSnaps.innerHTML='';
-      const q=query(collection(db,'snaps'), orderBy('timestamp','desc'));
-      onSnapshot(q,(snapshots)=>{
-        profileSnaps.innerHTML='';
-        snapshots.forEach(doc=>{
-          const data=doc.data();
-          if(data.uid!==currentUser.uid) return;
-          const div=document.createElement('div'); div.className='card';
-          div.innerHTML=`<img class="post-img" src="${data.image}"><div class="meta"><img class="avatar" src="${data.avatar}"><div>${data.name}</div></div>`;
-          profileSnaps.appendChild(div);
-        });
-      });
-    }
-
-    // Render feed
-    const feedQuery=query(collection(db,'snaps'), orderBy('timestamp','desc'));
-    onSnapshot(feedQuery,(snapshots)=>{
-      feedGrid.innerHTML='';
-      snapshots.forEach(doc=>{
-        const data=doc.data();
-        const div=document.createElement('div'); div.className='card';
-        div.innerHTML=`<img class="post-img" src="${data.image}"><div class="meta"><img class="avatar" src="${data.avatar}"><div>${data.name}</div></div>`;
-        feedGrid.appendChild(div);
-      });
-    });
-
+    window.addEventListener('load', startCamera);
   </script>
 </body>
 </html>
+
