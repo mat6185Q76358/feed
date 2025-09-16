@@ -1,237 +1,68 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>SnapClone — GitHub Pages Demo</title>
-  <style>
-    body{margin:0;font-family:Arial,sans-serif;background:#f3f4f6;color:#111827;}
-    header{display:flex;justify-content:space-between;padding:12px 16px;background:#fff;box-shadow:0 1px 4px rgba(0,0,0,0.1);}
-    main{padding:16px;}
-    .camera-wrap{position:relative;border-radius:12px;overflow:hidden;background:#000;height:60vh;display:flex;align-items:center;justify-content:center}
-    video{width:100%;height:100%;object-fit:cover}
-    .overlay-preview{position:absolute;left:0;right:0;bottom:32px;padding:8px;text-align:center;font-weight:700;text-shadow:0 2px 6px rgba(0,0,0,0.6);color:white;display:none}
-    .camera-controls{display:flex;gap:8px;margin-top:12px;align-items:center}
-    .btn{padding:10px 16px;border-radius:10px;border:0;cursor:pointer;font-weight:600}
-    .btn-primary{background:#FFFC00}
-    .btn-ghost{background:#fff;border:1px solid #eaeaea}
-    .btn-danger{background:#ffecec;color:#b91c1c}
-    .input{flex:1;padding:10px;border-radius:10px;border:1px solid #e6e7e8}
-    .preview-actions{display:flex;gap:8px;margin-top:12px;align-items:center;display:none}
-  </style>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>MiniGram with Google Sign-In</title>
+  <link rel="stylesheet" href="styles.css"/>
 </head>
 <body>
-  <header>
-    <h1>SnapClone</h1>
-    <div id="userBox">
-      <button class="btn btn-primary" id="signInBtn">Sign in with Google</button>
+  <header class="topbar">
+    <h1>MiniGram</h1>
+    <div class="user-area">
+      <img id="user-photo" class="avatar" hidden>
+      <span id="user-name">Not signed in</span>
+      <button id="google-signin-btn">Sign in with Google</button>
+      <button id="signout-btn" hidden>Sign out</button>
     </div>
   </header>
 
-  <main>
-    <div class="camera-wrap">
-      <video id="video" autoplay playsinline muted></video>
-      <div id="overlayPreview" class="overlay-preview"></div>
-      <canvas id="canvas" style="display:none"></canvas>
-    </div>
+  <main class="container">
+    <section class="create-post">
+      <h2>Create post</h2>
+      <input id="file-input" type="file" accept="image/*"/>
+      <input id="caption-input" type="text" placeholder="Write a caption..."/>
+      <button id="upload-btn">Upload</button>
+      <progress id="upload-progress" value="0" max="100" hidden></progress>
+      <div id="preview-area"></div>
+    </section>
 
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <input id="overlayInput" class="input" placeholder="Add text overlay"/>
-      <button id="flipBtn" class="btn btn-ghost">Flip</button>
-    </div>
-
-    <div class="camera-controls">
-      <button id="captureBtn" class="btn btn-primary" disabled>Capture</button>
-      <button id="clearBtn" class="btn btn-ghost" disabled>Clear</button>
-      <div style="flex:1"></div>
-      <div id="cameraStatus">Camera off</div>
-    </div>
-
-    <div id="previewActions" class="preview-actions">
-      <button id="postBtn" class="btn" style="background:#14b8a6;color:white" disabled>Post</button>
-      <button id="saveBtn" class="btn btn-ghost">Save to device</button>
-      <button id="deleteBtn" class="btn btn-danger">Delete</button>
-      <div style="flex:1"></div>
-      <div id="uploadStatus"></div>
-    </div>
+    <section class="feed">
+      <h2>Feed</h2>
+      <div id="posts"></div>
+    </section>
   </main>
 
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-app.js";
-    import { getAuth, signInWithPopup, GoogleAuthProvider, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-auth.js";
-    import { getFirestore, collection, addDoc, serverTimestamp, query, orderBy, onSnapshot } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-firestore.js";
-    import { getStorage, ref as storageRef, uploadString, getDownloadURL } from "https://www.gstatic.com/firebasejs/9.22.2/firebase-storage.js";
+  <!-- Template used for each post -->
+  <template id="post-template">
+    <article class="post">
+      <header class="post-header">
+        <img class="avatar author-photo">
+        <div class="meta">
+          <div class="author"></div>
+          <div class="time"></div>
+        </div>
+      </header>
+      <img class="post-image" src="" alt="post image"/>
+      <div class="post-actions">
+        <button class="like-btn">♥ <span class="like-count">0</span></button>
+      </div>
+      <div class="caption">
+        <strong class="author-inline"></strong>
+        <span class="caption-text"></span>
+      </div>
+      <div class="comments">
+        <div class="comments-list"></div>
+        <div class="comment-form">
+          <input class="comment-input" placeholder="Add a comment..."/>
+          <button class="comment-send">Post</button>
+        </div>
+      </div>
+    </article>
+  </template>
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
-      authDomain: "appp-5f90c.firebaseapp.com",
-      projectId: "appp-5f90c",
-      storageBucket: "appp-5f90c.appspot.com",
-      messagingSenderId: "215310083943",
-      appId: "1:215310083943:web:7869ceb90a03567558b1c2",
-      measurementId: "G-JJQCFT3PQ9"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
-    const db = getFirestore(app);
-    const storage = getStorage(app);
-
-    const signInBtn = document.getElementById('signInBtn');
-    const userBox = document.getElementById('userBox');
-
-    const video = document.getElementById('video');
-    const canvas = document.getElementById('canvas');
-    const captureBtn = document.getElementById('captureBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const overlayInput = document.getElementById('overlayInput');
-    const overlayPreview = document.getElementById('overlayPreview');
-    const flipBtn = document.getElementById('flipBtn');
-
-    const previewActions = document.getElementById('previewActions');
-    const postBtn = document.getElementById('postBtn');
-    const saveBtn = document.getElementById('saveBtn');
-    const deleteBtn = document.getElementById('deleteBtn');
-    const cameraStatus = document.getElementById('cameraStatus');
-    const uploadStatus = document.getElementById('uploadStatus');
-
-    let mediaStream = null;
-    let facingMode = 'user';
-    let currentUser = null;
-    let capturedDataUrl = null;
-
-    // --- Auth ---
-    signInBtn.addEventListener('click', async () => {
-      try { await signInWithPopup(auth, provider); } 
-      catch(e){ alert('Sign-in failed: ' + e.message); }
-    });
-
-    onAuthStateChanged(auth, (user)=>{
-      currentUser = user;
-      if(user){
-        userBox.innerHTML = '';
-        const img = document.createElement('img');
-        img.src = user.photoURL || '';
-        img.style.height = '36px';
-        img.style.width = '36px';
-        img.style.borderRadius = '50%';
-        userBox.appendChild(img);
-        const name = document.createElement('span');
-        name.textContent = user.displayName;
-        name.style.marginLeft='8px';
-        userBox.appendChild(name);
-        const signOutBtn = document.createElement('button');
-        signOutBtn.textContent='Sign out';
-        signOutBtn.className='btn btn-ghost';
-        signOutBtn.style.marginLeft='8px';
-        signOutBtn.onclick = async ()=>{await signOut(auth);};
-        userBox.appendChild(signOutBtn);
-      } else {
-        userBox.innerHTML = '';
-        const btn = document.createElement('button');
-        btn.textContent='Sign in with Google';
-        btn.className='btn btn-primary';
-        btn.onclick = async ()=>{await signInWithPopup(auth, provider);}
-        userBox.appendChild(btn);
-      }
-    });
-
-    // --- Camera ---
-    async function startCamera(){
-      stopCamera();
-      cameraStatus.textContent='Starting camera...';
-      try {
-        mediaStream = await navigator.mediaDevices.getUserMedia({video:{facingMode}, audio:false});
-      } catch(e){
-        console.warn('Front camera failed, fallback',e);
-        try{ mediaStream = await navigator.mediaDevices.getUserMedia({video:true, audio:false}); }
-        catch(err){ cameraStatus.textContent='No camera found'; alert('Camera failed'); return; }
-      }
-      video.srcObject = mediaStream;
-      await video.play();
-      cameraStatus.textContent='Camera active';
-      captureBtn.disabled=false;
-      clearBtn.disabled=true;
-      postBtn.disabled=true;
-    }
-
-    function stopCamera(){
-      if(mediaStream){ mediaStream.getTracks().forEach(t=>t.stop()); mediaStream=null; }
-      video.srcObject=null;
-      cameraStatus.textContent='Camera off';
-      captureBtn.disabled=true;
-    }
-
-    flipBtn.addEventListener('click', ()=>{facingMode = facingMode==='user'?'environment':'user'; startCamera();});
-
-    overlayInput.addEventListener('input', ()=>{overlayPreview.textContent = overlayInput.value; overlayPreview.style.display = overlayInput.value?'block':'none';});
-
-    captureBtn.addEventListener('click', ()=>{
-      if(!mediaStream) return alert('Camera not ready');
-      const w = video.videoWidth, h = video.videoHeight;
-      canvas.width = w; canvas.height = h;
-      const ctx = canvas.getContext('2d');
-      ctx.drawImage(video,0,0,w,h);
-      if(overlayInput.value){
-        const fontSize = Math.max(24, Math.floor(w/18));
-        ctx.font = `${fontSize}px Arial`;
-        ctx.fillStyle='white';
-        ctx.strokeStyle='rgba(0,0,0,0.6)';
-        ctx.lineWidth = Math.ceil(fontSize/6);
-        ctx.textAlign='center';
-        ctx.strokeText(overlayInput.value,w/2,h-fontSize*1.5);
-        ctx.fillText(overlayInput.value,w/2,h-fontSize*1.5);
-      }
-      capturedDataUrl = canvas.toDataURL('image/png');
-      previewActions.style.display='flex';
-      captureBtn.disabled=true;
-      postBtn.disabled=false;
-      clearBtn.disabled=false;
-    });
-
-    function resetPreview(){
-      capturedDataUrl=null;
-      previewActions.style.display='none';
-      captureBtn.disabled=false;
-      postBtn.disabled=true;
-      clearBtn.disabled=true;
-      overlayPreview.style.display='none';
-      overlayInput.value='';
-    }
-
-    saveBtn.addEventListener('click', ()=>{
-      if(!capturedDataUrl) return;
-      const a = document.createElement('a');
-      a.href=capturedDataUrl; a.download='snap.png';
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      resetPreview();
-    });
-
-    deleteBtn.addEventListener('click', ()=>{resetPreview();});
-
-    postBtn.addEventListener('click', async ()=>{
-      if(!capturedDataUrl || !currentUser) return alert('No image or not signed in');
-      uploadStatus.textContent='Uploading...';
-      try{
-        const storageReference = storageRef(storage,'snaps/'+Date.now()+'_'+currentUser.uid+'.png');
-        await uploadString(storageReference,capturedDataUrl,'data_url');
-        const url = await getDownloadURL(storageReference);
-        await addDoc(collection(db,'snaps'),{
-          uid: currentUser.uid,
-          name: currentUser.displayName,
-          avatar: currentUser.photoURL||'',
-          image: url,
-          timestamp: serverTimestamp()
-        });
-        uploadStatus.textContent='Uploaded!';
-        setTimeout(()=>uploadStatus.textContent='',1200);
-        resetPreview();
-      } catch(e){uploadStatus.textContent='Upload failed'; console.error(e);}
-    });
-
-    window.addEventListener('load', startCamera);
-  </script>
+  <!-- Firebase logic -->
+  <script type="module" src="app.js"></script>
 </body>
 </html>
 
