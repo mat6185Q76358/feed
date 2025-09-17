@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>Stories</title>
+<style>
+body{background:#000;color:#fff;font-family:sans-serif;margin:0;padding:0}
+.post{border-bottom:1px solid #333;padding:10px}
+.post img{max-width:100%;border-radius:10px}
+.bottom-nav{
+ position:fixed;
+ bottom:0;
+ left:0;
+ width:100%;
+ display:flex;
+ justify-content:space-around;
+ background:rgba(0,0,0,0.5);
+ padding:10px 0;
+}
+</style>
+</head>
+<body>
+<h2 style="text-align:center">Stories</h2>
+<div id="storyList"></div>
+<div class="bottom-nav">
+  <button onclick="location.href='index.html'">📷</button>
+  <button onclick="location.href='stories.html'">📖</button>
+  <button onclick="location.href='feed.html'">🌟</button>
+</div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-app.js";
+import { getFirestore, collection, getDocs, orderBy, query } from "https://www.gstatic.com/firebasejs/10.12.3/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyA-lNZ4RQS7Xpu2_vzBPCBaBsi_0TlL8dk",
+  authDomain: "appp-5f90c.firebaseapp.com",
+  projectId: "appp-5f90c",
+  storageBucket: "appp-5f90c.appspot.com",
+  messagingSenderId: "215310083943",
+  appId: "1:215310083943:web:7869ceb90a03567558b1c2",
+  measurementId: "G-JJQCFT3PQ9"
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+
+const q = query(collection(db,"stories"), orderBy("timestamp","desc"));
+const snap = await getDocs(q);
+const container = document.getElementById('storyList');
+snap.forEach(doc=>{
+  const d=doc.data();
+  container.innerHTML += `
+    <div class="post">
+      <img src="${d.imageURL}" alt="story">
+      <p>${d.caption||''}</p>
+      <p><strong>${d.printer||''}</strong></p>
+      ${d.stlURL?`<a href="${d.stlURL}" download>Download STL</a>`:''}
+    </div>`;
+});
+</script>
+</body>
+</html>
